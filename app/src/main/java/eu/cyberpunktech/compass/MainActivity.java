@@ -8,7 +8,9 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -17,8 +19,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private SensorManager sensorManager;
     private Sensor sensorMagneticField, sensorGravity;
     private double xA, yA, zA, xM, yM, zM;
-    private Button btnHeading;
-    private TextView tvHeading;
+    private Button btnHeading, buttonCalibrate;
+    private TextView tvHeading, tvMagneticField, tvCalibration;
+    private ProgressBar progressBarCalibration;
+    private long oldTime, currentTime;
+    private int calibrationReadings = 0;
+    private double oldPitch, oldRoll, integratedAngle;
+    private boolean calibrate = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,7 +33,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         setContentView(R.layout.activity_main);
 
         btnHeading = findViewById(R.id.btnHeading);
+        buttonCalibrate = findViewById(R.id.buttonCalibrate);
         tvHeading = findViewById(R.id.tvHeading);
+        tvMagneticField = findViewById(R.id.tvMagneticField);
+        tvCalibration = findViewById(R.id.textViewCalibration);
+        progressBarCalibration = findViewById(R.id.progressBarCalibration);
+        oldTime = System.currentTimeMillis();
 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         sensorGravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
@@ -102,6 +114,37 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if(heading==360) heading = 0;
 
         btnHeading.setRotation(heading);
-        tvHeading.setText("Heading: " + heading);
+        tvHeading.setText(heading + "°");
+        tvMagneticField.setText((int)Math.sqrt(xM*xM + yM*yM + zM*zM)+"uT");
+
+
+        if(calibrate)
+            currentTime = System.currentTimeMillis();
+
+        if((currentTime - oldTime) > 100 && calibrate)
+        {
+            if(calibrationReadings == 0)
+            {
+                oldPitch = Math.abs(pitch*57.29577951);
+                oldRoll = Math.abs(roll*57.29577951);
+            }else
+            {
+                integratedAngle += Math.abs(oldPitch-Math.abs(pitch)) + Math.abs(oldRoll-Math.abs(roll));
+                oldPitch = pitch;
+                oldRoll = roll;
+                progressBarCalibration.setProgress((int)(integratedAngle/2));
+                oldTime = currentTime;
+
+                if(progressBarCalibration.getProgress()==100)
+                {
+                    progressBarCalibration.setVisibility(View.GONE);
+                    tvCalibration.setVisibility(View.GONE);
+                    buttonCalibrate.setVisibility(View.GONE);
+                    tvHeading.setVisibility(View.VISIBLE);
+                    calibrate = false;
+                }
+            }
+            calibrationReadings++;
+        }
     }
 }
